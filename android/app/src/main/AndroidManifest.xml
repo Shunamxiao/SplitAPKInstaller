@@ -25,16 +25,49 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        
+        <!-- 文件关联：支持从文件管理器打开 -->
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="file" />
+            <data android:mimeType="*/*" />
+            <data android:pathPattern=".*\\.xapk" />
+            <data android:pathPattern=".*\\.apks" />
+            <data android:pathPattern=".*\\.apkm" />
+        </intent-filter>
+        
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="content" />
             <data android:mimeType="*/*" />
             <data android:pathPattern=".*\\.xapk" />
             <data android:pathPattern=".*\\.apks" />
             <data android:pathPattern=".*\\.apkm" />
+        </intent-filter>
+        
+        <!-- 支持 application/octet-stream MIME 类型 -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:scheme="file" />
+            <data android:scheme="content" />
+            <data android:mimeType="application/octet-stream" />
+            <data android:pathPattern=".*\\.xapk" />
+            <data android:pathPattern=".*\\.apks" />
+            <data android:pathPattern=".*\\.apkm" />
+        </intent-filter>
+        
+        <!-- 支持 application/vnd.android.package-archive -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:scheme="file" />
+            <data android:scheme="content" />
+            <data android:mimeType="application/vnd.android.package-archive" />
         </intent-filter>
       </activity>
       
