@@ -102,4 +102,4 @@ dependencies {
     }
 }
 
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+// Native modules are now auto-linked via settings.gradle in RN 0.76+
