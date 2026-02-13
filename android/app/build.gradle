@@ -7,7 +7,6 @@ react {
 }
 
 def enableProguardInReleaseBuilds = false
-def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -51,15 +50,13 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libfbjni.so'
     }
 }
 
 dependencies {
+    // React Native 0.76+ 自动处理 Hermes/JSC，不需要手动判断
     implementation("com.facebook.react:react-android")
-
-    if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
-    } else {
-        implementation jscFlavor
-    }
+    implementation("com.facebook.react:hermes-android")
 }
