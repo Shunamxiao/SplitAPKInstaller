@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
+import android.os.Build;
 import android.util.Log;
 
 public class InstallResultReceiver extends BroadcastReceiver {
@@ -16,10 +17,19 @@ public class InstallResultReceiver extends BroadcastReceiver {
         
         switch (status) {
             case PackageInstaller.STATUS_PENDING_USER_ACTION:
-                Intent confirmIntent = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                Intent confirmIntent;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    confirmIntent = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
+                } else {
+                    confirmIntent = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                }
                 if (confirmIntent != null) {
                     confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(confirmIntent);
+                    try {
+                        context.startActivity(confirmIntent);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to start confirmation activity", e);
+                    }
                 }
                 break;
             case PackageInstaller.STATUS_SUCCESS:
