@@ -37,7 +37,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    SoLoader.init(this, /* native exopackage */ false)
+    SoLoader.init(this, SoLoader.SOLOADER_ALLOW_ASYNC_INIT)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       load()
     }
