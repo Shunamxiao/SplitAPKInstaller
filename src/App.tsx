@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,8 @@ import {
   PermissionsAndroid,
   Platform,
   ScrollView,
+  NativeModules,
+  Linking,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
 import RNFS from 'react-native-fs';
@@ -20,40 +22,113 @@ import {
 } from './utils/fileParser';
 import {installPackage} from './utils/installer';
 
+const {PermissionModule} = NativeModules;
+
 type InstallStatus = 'idle' | 'selecting' | 'parsing' | 'copying_obb' | 'installing' | 'done' | 'error';
 
 function App(): React.JSX.Element {
   const [status, setStatus] = useState<InstallStatus>('idle');
   const [statusText, setStatusText] = useState('');
   const [packageInfo, setPackageInfo] = useState<ParsedPackage | null>(null);
+  const [hasStoragePermission, setHasStoragePermission] = useState<boolean | null>(null);
+  const [hasInstallPermission, setHasInstallPermission] = useState<boolean | null>(null);
 
-  const requestPermissions = async () => {
-    if (Platform.OS !== 'android') return true;
+  useEffect(() => {
+    checkPermissions();
+  }, []);
+
+  const checkPermissions = async () => {
+    if (Platform.OS !== 'android') {
+      setHasStoragePermission(true);
+      setHasInstallPermission(true);
+      return;
+    }
 
     try {
-      const granted = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-      ]);
+      // Check storage permission
+      const storageGranted = await PermissionModule.hasManageStoragePermission();
+      setHasStoragePermission(storageGranted);
 
-      return (
-        granted['android.permission.READ_EXTERNAL_STORAGE'] === 'granted' &&
-        granted['android.permission.WRITE_EXTERNAL_STORAGE'] === 'granted'
-      );
+      // Check install permission
+      const installGranted = await PermissionModule.canInstallPackages();
+      setHasInstallPermission(installGranted);
     } catch (err) {
-      console.warn(err);
-      return false;
+      console.warn('Permission check failed:', err);
+      // Fallback for older Android versions
+      setHasStoragePermission(true);
+      setHasInstallPermission(true);
     }
   };
 
-  const selectAndInstall = async () => {
+  const requestStoragePermission = async () => {
     try {
-      const hasPermission = await requestPermissions();
-      if (!hasPermission) {
-        Alert.alert('权限错误', '需要存储权限才能安装应用');
-        return;
+      const apiLevel = Platform.Version as number;
+      
+      if (apiLevel >= 30) {
+        // Android 11+ needs MANAGE_EXTERNAL_STORAGE
+        Alert.alert(
+          '需要存储权限',
+          '请在设置中允许"所有文件访问"权限，以便读取和复制安装包文件。',
+          [
+            {text: '取消', style: 'cancel'},
+            {
+              text: '去设置',
+              onPress: async () => {
+                await PermissionModule.requestManageStoragePermission();
+                // Re-check after returning from settings
+                setTimeout(checkPermissions, 1000);
+              },
+            },
+          ]
+        );
+      } else {
+        // Android 10 and below
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        ]);
+        const hasPermission = 
+          granted['android.permission.READ_EXTERNAL_STORAGE'] === 'granted' &&
+          granted['android.permission.WRITE_EXTERNAL_STORAGE'] === 'granted';
+        setHasStoragePermission(hasPermission);
       }
+    } catch (err) {
+      console.warn(err);
+    }
+  };
 
+  const requestInstallPermission = async () => {
+    Alert.alert(
+      '需要安装权限',
+      '请在设置中允许"安装未知应用"权限。',
+      [
+        {text: '取消', style: 'cancel'},
+        {
+          text: '去设置',
+          onPress: async () => {
+            await PermissionModule.requestInstallPermission();
+            setTimeout(checkPermissions, 1000);
+          },
+        },
+      ]
+    );
+  };
+
+  const selectAndInstall = async () => {
+    // Re-check permissions before proceeding
+    await checkPermissions();
+
+    if (!hasStoragePermission) {
+      await requestStoragePermission();
+      return;
+    }
+
+    if (!hasInstallPermission) {
+      await requestInstallPermission();
+      return;
+    }
+
+    try {
       setStatus('selecting');
       setStatusText('选择文件...');
 
@@ -129,12 +204,51 @@ function App(): React.JSX.Element {
     setPackageInfo(null);
   };
 
+  const renderPermissionStatus = () => {
+    if (hasStoragePermission === null || hasInstallPermission === null) {
+      return null;
+    }
+
+    const needsPermission = !hasStoragePermission || !hasInstallPermission;
+    if (!needsPermission) return null;
+
+    return (
+      <View style={styles.permissionCard}>
+        <Text style={styles.permissionTitle}>需要授权</Text>
+        
+        {!hasStoragePermission && (
+          <TouchableOpacity 
+            style={styles.permissionButton} 
+            onPress={requestStoragePermission}
+          >
+            <Text style={styles.permissionButtonText}>
+              ⚠️ 授权文件访问权限
+            </Text>
+          </TouchableOpacity>
+        )}
+        
+        {!hasInstallPermission && (
+          <TouchableOpacity 
+            style={styles.permissionButton} 
+            onPress={requestInstallPermission}
+          >
+            <Text style={styles.permissionButtonText}>
+              ⚠️ 授权安装应用权限
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Split APK Installer</Text>
         <Text style={styles.subtitle}>支持 APK / XAPK / APKS / APKM</Text>
       </View>
+
+      {renderPermissionStatus()}
 
       <View style={styles.card}>
         {status === 'idle' ? (
@@ -176,7 +290,7 @@ function App(): React.JSX.Element {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          提示: 安装时系统会弹出确认对话框
+          提示: 首次使用需要授权文件访问和安装权限
         </Text>
       </View>
     </ScrollView>
@@ -206,6 +320,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 8,
+  },
+  permissionCard: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FFE69C',
+  },
+  permissionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#856404',
+    marginBottom: 12,
+  },
+  permissionButton: {
+    backgroundColor: '#FFC107',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  permissionButtonText: {
+    color: '#212529',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   card: {
     backgroundColor: '#FFF',
