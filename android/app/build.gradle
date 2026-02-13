@@ -35,6 +35,13 @@ android {
         }
     }
     
+    // 禁用 ABI 分割，生成单一 Universal APK
+    splits {
+        abi {
+            enable false
+        }
+    }
+    
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
