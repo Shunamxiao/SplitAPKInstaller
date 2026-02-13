@@ -55,7 +55,7 @@ android {
     
     packagingOptions {
         jniLibs {
-            useLegacyPackaging = true
+            useLegacyPackaging = false
         }
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libfbjni.so'
